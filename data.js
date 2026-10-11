@@ -23,7 +23,7 @@ window.PROJECTS = [
   },
   {
     id: "match3",
-    name: "3매치 퍼즐 게임",
+    name: "젤리팝 3매치 퍼즐 게임",
     tool: "미확인",
     status: "진행중",
     updated: "2026-10-11",
