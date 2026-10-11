@@ -37,6 +37,12 @@
   .badge.진행중 { background:var(--accent); }
   .badge.대기 { background:var(--gray); }
   .badge.완료 { background:var(--green); }
+  .badge.check { background:#c9a227; }
+  .tool { display:inline-block; font-size:.7rem; padding:1px 8px; border-radius:999px; margin-right:6px;
+          border:1px solid var(--line); color:var(--muted); }
+  .tool.ChatGPT { color:var(--green); border-color:var(--green); }
+  .tool.Claude { color:var(--accent); border-color:var(--accent); }
+  .filters-label { color:var(--muted); font-size:.75rem; align-self:center; margin-right:2px; }
   .meta { color:var(--muted); font-size:.75rem; margin-bottom:8px; }
   ul { margin:0; padding-left:1.1em; }
   li { margin:2px 0; font-size:.92rem; }
@@ -65,6 +71,7 @@
 
   <div id="todoView">
     <div class="filters" id="filters"></div>
+    <div class="filters" id="toolFilters"></div>
     <div class="grid" id="grid"></div>
   </div>
 
@@ -76,7 +83,10 @@
 (function () {
   var projects = window.PROJECTS || [];
   var filter = "전체";
-  var statuses = ["전체", "진행중", "대기", "완료"];
+  var statuses = ["전체", "진행중", "대기", "완료", "확인 필요"];
+  var toolFilter = "전체";
+  var tools = ["전체", "ChatGPT", "Claude", "미확인"];
+  function badgeClass(s) { return s === "확인 필요" ? "check" : s; }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -101,18 +111,29 @@
       b.onclick = function () { filter = s; renderFilters(); renderGrid(); };
       box.appendChild(b);
     });
+    var tbox = document.getElementById("toolFilters");
+    tbox.innerHTML = '<span class="filters-label">제작 도구</span>';
+    tools.forEach(function (t) {
+      var b = document.createElement("button");
+      b.className = "chip" + (t === toolFilter ? " active" : "");
+      b.textContent = t;
+      b.onclick = function () { toolFilter = t; renderFilters(); renderGrid(); };
+      tbox.appendChild(b);
+    });
   }
 
   function renderGrid() {
     var grid = document.getElementById("grid");
-    var list = projects.filter(function (p) { return filter === "전체" || p.status === filter; });
+    var list = projects.filter(function (p) {
+      return (filter === "전체" || p.status === filter) && (toolFilter === "전체" || (p.tool || "미확인") === toolFilter);
+    });
     // 최근 업데이트 순
     list.sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); });
     if (!list.length) { grid.innerHTML = '<div class="empty">해당하는 프로젝트가 없어요</div>'; return; }
     grid.innerHTML = list.map(function (p) {
       var todos = (p.todo || []).map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
-      return '<div class="card"><h2><span>' + esc(p.name) + '</span><span class="badge ' + esc(p.status) + '">' + esc(p.status) + '</span></h2>' +
-        '<div class="meta">업데이트 ' + esc(p.updated || "-") + '</div>' +
+      return '<div class="card"><h2><span>' + esc(p.name) + '</span><span class="badge ' + badgeClass(p.status) + '">' + esc(p.status) + '</span></h2>' +
+        '<div class="meta"><span class="tool ' + esc(p.tool || "미확인") + '">' + esc(p.tool || "미확인") + '</span>업데이트 ' + esc(p.updated || "-") + '</div>' +
         '<ul>' + (todos || '<li style="color:var(--muted)">할 일 없음</li>') + '</ul></div>';
     }).join("");
   }
