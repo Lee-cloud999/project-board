@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 현황판</title>
+<style>
+  :root {
+    --bg: #faf8f4; --card: #ffffff; --text: #2b2926; --muted: #7a746b;
+    --line: #e8e3da; --accent: #e8913a; --accent-soft: #fdf0e0;
+    --green: #4c9a6a; --gray: #9a948a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1d1b19; --card:#27241f; --text:#efebe4; --muted:#a39d92;
+            --line:#38342d; --accent:#f0a458; --accent-soft:#3a2d1c;
+            --green:#6cbf8a; --gray:#8a847a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+         line-height:1.6; }
+  .wrap { max-width:960px; margin:0 auto; padding:20px 16px 60px; }
+  header h1 { margin:8px 0 4px; font-size:1.5rem; }
+  header p { margin:0 0 16px; color:var(--muted); font-size:.9rem; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab { border:1px solid var(--line); background:var(--card); color:var(--text);
+         padding:8px 16px; border-radius:999px; cursor:pointer; font-size:.9rem; }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .chip { border:1px solid var(--line); background:transparent; color:var(--muted);
+          padding:4px 12px; border-radius:999px; cursor:pointer; font-size:.8rem; }
+  .chip.active { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .card h2 { margin:0 0 6px; font-size:1.05rem; display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .badge { font-size:.7rem; padding:2px 8px; border-radius:999px; white-space:nowrap; color:#fff; }
+  .badge.진행중 { background:var(--accent); }
+  .badge.대기 { background:var(--gray); }
+  .badge.완료 { background:var(--green); }
+  .meta { color:var(--muted); font-size:.75rem; margin-bottom:8px; }
+  ul { margin:0; padding-left:1.1em; }
+  li { margin:2px 0; font-size:.92rem; }
+  .card .more { margin-top:10px; background:none; border:none; color:var(--accent);
+                cursor:pointer; padding:0; font-size:.85rem; }
+  .history details { background:var(--card); border:1px solid var(--line); border-radius:12px;
+                     padding:12px 16px; margin-bottom:10px; }
+  .history summary { cursor:pointer; font-weight:600; }
+  .log li { list-style:none; margin-left:-1.1em; }
+  .log .d { color:var(--muted); font-size:.8rem; margin-right:8px; }
+  .empty { color:var(--muted); text-align:center; padding:40px 0; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>프로젝트 현황판</h1>
+    <p id="summary"></p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-view="todo">다음 할 일</button>
+    <button class="tab" data-view="history">지금까지 한 일</button>
+  </div>
+
+  <div id="todoView">
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div id="historyView" class="history hidden"></div>
+</div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  var projects = window.PROJECTS || [];
+  var filter = "전체";
+  var statuses = ["전체", "진행중", "대기", "완료"];
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function renderSummary() {
+    var active = projects.filter(function (p) { return p.status === "진행중"; }).length;
+    var latest = projects.reduce(function (m, p) { return p.updated > m ? p.updated : m; }, "");
+    document.getElementById("summary").textContent =
+      "전체 " + projects.length + "개 · 진행중 " + active + "개" + (latest ? " · 마지막 업데이트 " + latest : "");
+  }
+
+  function renderFilters() {
+    var box = document.getElementById("filters");
+    box.innerHTML = "";
+    statuses.forEach(function (s) {
+      var b = document.createElement("button");
+      b.className = "chip" + (s === filter ? " active" : "");
+      b.textContent = s;
+      b.onclick = function () { filter = s; renderFilters(); renderGrid(); };
+      box.appendChild(b);
+    });
+  }
+
+  function renderGrid() {
+    var grid = document.getElementById("grid");
+    var list = projects.filter(function (p) { return filter === "전체" || p.status === filter; });
+    // 최근 업데이트 순
+    list.sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); });
+    if (!list.length) { grid.innerHTML = '<div class="empty">해당하는 프로젝트가 없어요</div>'; return; }
+    grid.innerHTML = list.map(function (p) {
+      var todos = (p.todo || []).map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
+      return '<div class="card"><h2><span>' + esc(p.name) + '</span><span class="badge ' + esc(p.status) + '">' + esc(p.status) + '</span></h2>' +
+        '<div class="meta">업데이트 ' + esc(p.updated || "-") + '</div>' +
+        '<ul>' + (todos || '<li style="color:var(--muted)">할 일 없음</li>') + '</ul></div>';
+    }).join("");
+  }
+
+  function renderHistory() {
+    var box = document.getElementById("historyView");
+    box.innerHTML = projects.map(function (p) {
+      var logs = (p.log || []).slice().sort(function (a, b) { return b.date.localeCompare(a.date); });
+      var items = logs.map(function (l) {
+        return '<li><span class="d">' + esc(l.date) + '</span>' + esc(l.text) + '</li>';
+      }).join("");
+      return '<details><summary>' + esc(p.name) + ' <span class="meta">(' + logs.length + '건)</span></summary>' +
+        '<ul class="log">' + (items || '<li>기록 없음</li>') + '</ul></details>';
+    }).join("");
+  }
+
+  document.querySelectorAll(".tab").forEach(function (t) {
+    t.onclick = function () {
+      document.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
+      t.classList.add("active");
+      var v = t.getAttribute("data-view");
+      document.getElementById("todoView").classList.toggle("hidden", v !== "todo");
+      document.getElementById("historyView").classList.toggle("hidden", v !== "history");
+    };
+  });
+
+  renderSummary(); renderFilters(); renderGrid(); renderHistory();
+})();
+</script>
+</body>
+</html>
